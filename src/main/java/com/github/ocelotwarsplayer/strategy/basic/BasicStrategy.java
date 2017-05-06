@@ -23,6 +23,9 @@ public class BasicStrategy {
 	}
 
 	List<Unit> getUnits(Playground playground) {
+		// TODO this selects the player's units, but information about their
+		// position and other information about resources, headquarters etc. is
+		// lost. Better domain Model is needed see #1
 		Stream<Asset> assets = playground.getTiles().stream()
 			.flatMap(l -> l.stream())
 			.map(t -> t.getAssets())

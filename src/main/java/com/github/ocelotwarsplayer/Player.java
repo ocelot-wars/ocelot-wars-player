@@ -22,7 +22,7 @@ public class Player extends AbstractVerticle {
 	private static final String GAME_HOST = "localhost";
 
 	private static final int MY_PORT = 8081;
-	
+
 	private BasicStrategy strategy = new BasicStrategy(new PlayerName(PLAYER_NAME));
 
 	@Override
@@ -58,9 +58,9 @@ public class Player extends AbstractVerticle {
 	public void requestMove(RoutingContext context) {
 		System.out.println(context.getBodyAsString());
 		Playground playground = Json.decodeValue(context.getBodyAsString(),
-  		      Playground.class);
-  	
-  	strategy.calculateMoves(playground);
+			Playground.class);
+
+		strategy.calculateMoves(playground);//TODO this method should return a list of moves to be sent to the host
 		context.response().setStatusCode(OK.code()).end();
 	}
 
