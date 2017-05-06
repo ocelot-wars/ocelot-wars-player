@@ -16,7 +16,6 @@ public class Player extends AbstractVerticle {
 	private static final int GAME_HOST_PORT = 8080;
 	private static final String GAME_HOST = "localhost";
 
-	private static final String MY_HOST = "localhost";
 	private static final int MY_PORT = 8081;
 
 	@Override
@@ -24,8 +23,7 @@ public class Player extends AbstractVerticle {
 		Router router = Router.router(vertx);
 
 		HttpClient client = vertx.createHttpClient();
-		client.post(GAME_HOST_PORT, GAME_HOST, "/register/myplayer/" + MY_HOST + "/" + MY_PORT, this::registerResponse)
-				.end();
+		client.post(GAME_HOST_PORT, GAME_HOST, "/register/myplayer/" + MY_PORT, this::registerResponse).end();
 
 		router.post("/requestMove").handler(this::requestMove);
 		router.post("/invite").handler(this::invite);
