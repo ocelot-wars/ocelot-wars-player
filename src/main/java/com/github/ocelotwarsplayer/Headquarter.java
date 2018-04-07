@@ -1,11 +1,8 @@
 package com.github.ocelotwarsplayer;
 
-public class Headquarter extends Asset {
+public class Headquarter implements Asset {
 
     private int resources;
-
-    public Headquarter(int resources) {
-    }
 
     public int getResources() {
         return resources;
