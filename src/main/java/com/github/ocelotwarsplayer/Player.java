@@ -1,72 +1,87 @@
 package com.github.ocelotwarsplayer;
 
 import static io.netty.handler.codec.http.HttpResponseStatus.INTERNAL_SERVER_ERROR;
-import static io.netty.handler.codec.http.HttpResponseStatus.OK;
-
-import com.github.ocelotwarsplayer.playground.api.Playground;
+import java.io.IOException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.ocelotwarsplayer.strategy.basic.BasicStrategy;
-
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.http.HttpClient;
-import io.vertx.core.http.HttpClientResponse;
-import io.vertx.core.http.HttpServer;
-import io.vertx.core.json.Json;
-import io.vertx.ext.web.Router;
+import io.vertx.core.http.WebSocket;
+import io.vertx.core.http.WebSocketFrame;
 import io.vertx.ext.web.RoutingContext;
 
 public class Player extends AbstractVerticle {
 
-	private static final String PLAYER_NAME = "myplayer";
-	private static final String ACCEPT = "accept";
-	private static final int GAME_HOST_PORT = 8080;
-	private static final String GAME_HOST = "localhost";
+    private static final String PLAYER_NAME = "myplayer";
+    private static final int GAME_HOST_PORT = 8080;
+    private static final String GAME_HOST = "localhost";
 
-	private static final int MY_PORT = 8081;
+    private ObjectMapper mapper;
+    private BasicStrategy strategy;
 
-	private BasicStrategy strategy = new BasicStrategy(new PlayerName(PLAYER_NAME));
+    public Player() {
+        mapper = new ObjectMapper();
+        strategy = new BasicStrategy(new PlayerName(PLAYER_NAME));
+    }
 
-	@Override
-	public void start() {
-		Router router = Router.router(vertx);
+    @Override
+    public void start() {
+        HttpClient client = vertx.createHttpClient();
+        client.websocket(GAME_HOST_PORT, GAME_HOST, "", this::websocket);
+    }
 
-		HttpClient client = vertx.createHttpClient();
-		client.post(GAME_HOST_PORT, GAME_HOST, "/register/" + PLAYER_NAME + "/" + MY_PORT, this::registerResponse).end();
+    public void websocket(WebSocket socket) {
+        try {
+            socket.writeFinalTextFrame(json(new Register(PLAYER_NAME)));
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+        socket.frameHandler(frame -> message(frame, socket));
+    }
 
-		router.post("/requestMove").handler(this::requestMove);
-		router.post("/invite").handler(this::invite);
-		router.route().failureHandler(this::fail);
+    public void message(WebSocketFrame frame, WebSocket socket) {
+        String text = frame.textData();
+        try {
+            Message msg = fromJson(text);
+            System.out.println("message:" + text + "->" + msg.getClass().getName());
+            if (msg instanceof Invite) {
+                invite((Invite) msg, socket);
+            } else if (msg instanceof Notify) {
+                notify((Notify) msg, socket);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
-		HttpServer server = vertx.createHttpServer();
-		server.requestHandler(router::accept).listen(MY_PORT);
-	}
+    protected String json(OutMessage value) throws JsonProcessingException {
+        return mapper.writeValueAsString(value);
+    }
 
-	public void registerResponse(HttpClientResponse response) {
-		System.out.println("Received Registration Response: " + response.statusCode() + " " + response.statusMessage());
-		if (response.statusCode() != OK.code()) {
-			System.out.println("Registration Failed with Status Code " + response.statusCode());
-		}
-		if (!ACCEPT.equals(response.statusMessage())) {
-			System.out.println("Registration Failed with Status Message " + response.statusMessage());
-			System.out.println("Expected Status Message: " + ACCEPT);
-		}
-	}
+    protected Message fromJson(String message) throws IOException {
+        return mapper.readValue(message, Message.class);
+    }
 
-	public void invite(RoutingContext context) {
-		context.response().setStatusMessage(ACCEPT).setStatusCode(OK.code()).end();
-	}
+    public void invite(Invite invite, WebSocket websocket) {
+        try {
+            websocket.writeFinalTextFrame(json(new Accept()));
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+    }
 
-	public void requestMove(RoutingContext context) {
-		System.out.println(context.getBodyAsString());
-		Playground playground = Json.decodeValue(context.getBodyAsString(),
-			Playground.class);
+    public void notify(Notify notify, WebSocket websocket) {
+        try {
+            websocket.writeFinalTextFrame(json(new Commands()));
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+    }
 
-		strategy.calculateMoves(playground);//TODO this method should return a list of moves to be sent to the host
-		context.response().setStatusCode(OK.code()).end();
-	}
+    public void fail(RoutingContext context) {
 
-	public void fail(RoutingContext context) {
-
-		context.response().setStatusCode(INTERNAL_SERVER_ERROR.code()).end();
-	}
+        context.response().setStatusCode(INTERNAL_SERVER_ERROR.code()).end();
+    }
 
 }
